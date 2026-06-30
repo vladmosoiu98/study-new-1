@@ -9,8 +9,7 @@ Commands (type inside the chat):
   /exit             — quit
 """
 
-import os, sys, textwrap
-from typing import Optional
+import os, sys
 
 try:
     import anthropic
@@ -35,8 +34,11 @@ GREY   = "\033[90m"
 
 # Enable ANSI on Windows
 if sys.platform == "win32":
-    import ctypes
-    ctypes.windll.kernel32.SetConsoleMode(ctypes.windll.kernel32.GetStdHandle(-11), 7)
+    try:
+        import ctypes
+        ctypes.windll.kernel32.SetConsoleMode(ctypes.windll.kernel32.GetStdHandle(-11), 7)
+    except Exception:
+        pass
 
 # ── Model catalogues ────────────────────────────────────────────────────────
 CLAUDE_MODELS = [
@@ -104,11 +106,16 @@ def stream_claude(user_msg: str) -> str:
     msgs = history + [{"role": "user", "content": user_msg}]
     full = ""
     print(f"\n{CYAN}Claude:{R} ", end="", flush=True)
-    with client.messages.stream(model=model, max_tokens=8096, messages=msgs) as s:
-        for text in s.text_stream:
-            print(text, end="", flush=True)
-            full += text
-    print()
+    try:
+        with client.messages.stream(model=model, max_tokens=8096, messages=msgs) as s:
+            for text in s.text_stream:
+                print(text, end="", flush=True)
+                full += text
+    except Exception as e:
+        print(f"\n{RED}Error: {e}{R}")
+        return ""
+    finally:
+        print()
     return full
 
 def stream_zai(user_msg: str) -> str:
@@ -120,12 +127,18 @@ def stream_zai(user_msg: str) -> str:
     msgs = history + [{"role": "user", "content": user_msg}]
     full = ""
     print(f"\n{PURPLE}z.ai:{R} ", end="", flush=True)
-    stream = client.chat.completions.create(model=model, messages=msgs, stream=True)
-    for chunk in stream:
-        delta = chunk.choices[0].delta.content or ""
-        print(delta, end="", flush=True)
-        full += delta
-    print()
+    try:
+        stream = client.chat.completions.create(model=model, messages=msgs, stream=True)
+        for chunk in stream:
+            if chunk.choices:
+                delta = chunk.choices[0].delta.content or ""
+                print(delta, end="", flush=True)
+                full += delta
+    except Exception as e:
+        print(f"\n{RED}Error: {e}{R}")
+        return ""
+    finally:
+        print()
     return full
 
 def handle_command(cmd: str) -> bool:
